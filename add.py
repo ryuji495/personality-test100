@@ -59,7 +59,12 @@ if current_key in question_tree and isinstance(question_tree[current_key], dict)
             st.session_state.current_key = next_key
             st.rerun()
 else:
-    st.success(question_tree[current_key])
+    result_text = question_tree[current_key]
+    st.success(result_text, icon="✅")
+
+    # 結果用の画像を表示
+    show_image_for_question(current_key)
+
     if st.button("もう一度やる"):
         st.session_state.current_key = "start"
         st.rerun()
