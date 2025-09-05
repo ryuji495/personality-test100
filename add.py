@@ -18,7 +18,7 @@ question_tree = {
     "c": "🌧 あなたは **ネガティブタイプ** です！/常に最低の事態を想定しており、いざ何か起こったときにも、立ち直りや対策を練ることができる人",
     "d": "🔥 あなたは **怒りっぽいタイプ** です！/感情表現がストレートで人間関係を築きやすい、大切なものを守ろうとする強い意志や真剣さを持つ、不満を前向きなエネルギーに変えて行動できる人",
     "e": "❄️ あなたは**クールタイプ** です！/感情を表に出さず冷静、周りに流されずに自分のポリシーを持っている、ミステリアスな雰囲気の人",
-      "f": "🌙 あなたは **おとなしいタイプ** です！/穏やかで物静か、一人の時間を大切にする、周りの状況を冷静に観察する視点を持つ人",
+    "f": "🌙 あなたは **おとなしいタイプ** です！/穏やかで物静か、一人の時間を大切にする、周りの状況を冷静に観察する視点を持つ人",
     "g": "🎭 あなたは **感情豊かなタイプ** です！/共感力が高く、繊細で、感情表現が豊か、芸術に感動したり、日常生活に喜びを見出したりと、様々なものに深く心を動かされる人",
     "h": "💪 あなたは **熱血タイプ** です！/エネルギッシュで情熱的、周りを鼓舞して人を巻き込む力がある人",
     "i": "🌼 あなたは **天然タイプ** です！/素直で裏表のない感情表現、独特な発想や感性、おっちょこちょいな一面、そして他人の評価を気にしないマイペースな人",
@@ -30,41 +30,53 @@ def show_image_for_question(key):
     if os.path.exists(image_path):
         st.image(image_path, use_container_width=True)
 
-# セッション状態を使って進行管理
-if 'current_key' not in st.session_state:
+# 初期化
+if "nickname" not in st.session_state:
+    st.session_state.nickname = None
+if "current_key" not in st.session_state:
     st.session_state.current_key = "start"
-
-current_key = st.session_state.current_key
 
 st.markdown("<h1 style='text-align: center;'>🧠 性格診断テスト</h1>", unsafe_allow_html=True)
 st.markdown("---")
 
-if current_key in question_tree and isinstance(question_tree[current_key], dict):
-    question = question_tree[current_key]['text']
-
-    # 画像表示（ファイルがある場合のみ）
-    show_image_for_question(current_key)
-    with st.container():
-        st.markdown(f"<div style='padding: 20px; border-radius: 10px; background-color: #f0f2f6;'><h3 style='text-align: center;'>{question}</h3></div>", unsafe_allow_html=True)
-        
-    st.markdown(" ")
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        if st.button("はい", use_container_width=True):
-            next_key = question_tree[current_key]["yes"]
-            st.session_state.current_key = next_key
-            st.rerun()
-        if st.button("いいえ", use_container_width=True):
-            next_key = question_tree[current_key]["no"]
-            st.session_state.current_key = next_key
-            st.rerun()
-else:
-    result_text = question_tree[current_key]
-    st.success(result_text, icon="✅")
-
-    # 結果用の画像を表示
-    show_image_for_question(current_key)
-
-    if st.button("もう一度やる"):
+# ニックネーム入力フェーズ
+if st.session_state.nickname is None:
+    nickname = st.text_input("まずはニックネームを入力してください 👇")
+    if st.button("診断を始める") and nickname.strip():
+        st.session_state.nickname = nickname.strip()
         st.session_state.current_key = "start"
         st.rerun()
+else:
+    current_key = st.session_state.current_key
+
+    if current_key in question_tree and isinstance(question_tree[current_key], dict):
+        question = question_tree[current_key]['text']
+
+        # 画像表示
+        show_image_for_question(current_key)
+        with st.container():
+            st.markdown(f"<div style='padding: 20px; border-radius: 10px; background-color: #f0f2f6;'><h3 style='text-align: center;'>{question}</h3></div>", unsafe_allow_html=True)
+            
+        st.markdown(" ")
+        col1, col2, col3 = st.columns([1,2,1])
+        with col2:
+            if st.button("はい", use_container_width=True):
+                next_key = question_tree[current_key]["yes"]
+                st.session_state.current_key = next_key
+                st.rerun()
+            if st.button("いいえ", use_container_width=True):
+                next_key = question_tree[current_key]["no"]
+                st.session_state.current_key = next_key
+                st.rerun()
+    else:
+        result_text = question_tree[current_key]
+        st.success(f"{st.session_state.nickname} さんの診断結果：\n\n{result_text}", icon="✅")
+
+        # 結果画像表示
+        show_image_for_question(current_key)
+
+        if st.button("もう一度やる"):
+            st.session_state.current_key = "start"
+            st.session_state.nickname = None  # ニックネームもリセット
+            st.rerun()
+
