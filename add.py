@@ -33,17 +33,25 @@ def show_image_for_question(key):
 # 初期化
 if "nickname" not in st.session_state:
     st.session_state.nickname = None
+if "password" not in st.session_state:
+    st.session_state.password = None
 if "current_key" not in st.session_state:
     st.session_state.current_key = "start"
 
 st.markdown("<h1 style='text-align: center;'>🧠 性格診断テスト</h1>", unsafe_allow_html=True)
 st.markdown("---")
 
-# ニックネーム入力フェーズ
-if st.session_state.nickname is None:
-    nickname = st.text_input("まずはニックネームを入力してください 👇")
-    if st.button("診断を始める") and nickname.strip():
+# ニックネーム + パスワード入力フェーズ
+if st.session_state.nickname is None or st.session_state.password is None:
+    st.markdown(
+        "<p style='color:red; font-weight:bold;'>入力したニックネームは今後シューティングゲームをプレイする際に使用するので、保存やメモなど忘れないようにしてください。</p>",
+        unsafe_allow_html=True
+    )
+    nickname = st.text_input("ニックネームを入力してください 👇")
+    password = st.text_input("パスワードを入力してください 👇", type="password")
+    if st.button("診断を始める") and nickname.strip() and password.strip():
         st.session_state.nickname = nickname.strip()
+        st.session_state.password = password.strip()
         st.session_state.current_key = "start"
         st.rerun()
 else:
@@ -77,6 +85,8 @@ else:
 
         if st.button("もう一度やる"):
             st.session_state.current_key = "start"
-            st.session_state.nickname = None  # ニックネームもリセット
+            st.session_state.nickname = None  # ニックネームをリセット
+            st.session_state.password = None  # パスワードもリセット
             st.rerun()
+
 
