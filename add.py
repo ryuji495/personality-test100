@@ -76,36 +76,17 @@ else:
                 next_key = question_tree[current_key]["no"]
                 st.session_state.current_key = next_key
                 st.rerun()
-   else:
-    result_text = question_tree[current_key]
-    st.success(f"{st.session_state.nickname} さんの診断結果：\n\n{result_text}", icon="✅")
+    else:
+        result_text = question_tree[current_key]
+        st.success(f"{st.session_state.nickname} さんの診断結果：\n\n{result_text}", icon="✅")
 
-    # 結果画像表示
-    show_image_for_question(current_key)
+        # 結果画像表示
+        show_image_for_question(current_key)
 
-    # 🔽 スプレッドシートに保存
-    save_to_google_sheet(st.session_state.nickname, st.session_state.password, result_text)
+        if st.button("もう一度やる"):
+            st.session_state.current_key = "start"
+            st.session_state.nickname = None  # ニックネームをリセット
+            st.session_state.password = None  # パスワードもリセット
+            st.rerun()
 
-    if st.button("もう一度やる"):
-        st.session_state.current_key = "start"
-        st.session_state.nickname = None
-        st.session_state.password = None
-        st.rerun()
-
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-
-def save_to_google_sheet(nickname, password, result_text):
-    # スプレッドシートAPI用スコープ
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-
-    # サービスアカウントで認証
-    creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
-    client = gspread.authorize(creds)
-
-    # スプレッドシートを開く（スプレッドシートのURLからIDをコピーして貼る）
-    sheet = client.open_by_key("<<<YOUR_SPREADSHEET_ID>>>").sheet1
-
-    # データを追加（末尾に新しい行を挿入）
-    sheet.append_row([nickname, password, result_text])
 
