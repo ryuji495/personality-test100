@@ -1,7 +1,19 @@
 import streamlit as st
 import os
+import json
+import base64
+from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
 
-# 質問と選択肢の設定
+# --- スプレッドシート設定（必要に応じて変更） ---
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
+SPREADSHEET_NAME = "personality_test"  # ← あなたのスプレッドシート名に変更
+
+# --- 質問ツリー（あなたの元の内容） ---
 question_tree = {
     "start": {"text": "あなたはよく外出をするほうですか？", "yes": "q1", "no": "q2"},
     "q1": {"text": "コミュ力があると思う？", "yes": "q3", "no": "q4"},
@@ -30,16 +42,76 @@ def show_image_for_question(key):
     if os.path.exists(image_path):
         st.image(image_path, use_container_width=True)
 
-# 初期化
+# --- Google Sheets helper ---
+def get_gspread_client():
+    """
+    環境変数 SERVICE_ACCOUNT_JSON（JSON文字列 or base64）を優先読み取り。
+    なければローカルの service_account.json を使う。
+    """
+    env = os.environ.get("SERVICE_ACCOUNT_JSON")
+    if env:
+        # try plain json
+        try:
+            info = json.loads(env)
+        except Exception:
+            # try base64
+            try:
+                decoded = base64.b64decode(env).decode("utf-8")
+                info = json.loads(decoded)
+            except Exception as e:
+                raise RuntimeError("SERVICE_ACCOUNT_JSON の読み込みに失敗しました: " + str(e))
+        creds = Credentials.from_service_account_info(info, scopes=SCOPES)
+        return gspread.authorize(creds)
+
+    # local file fallback
+    keyfile = "service_account.json"
+    if os.path.exists(keyfile):
+        creds = Credentials.from_service_account_file(keyfile, scopes=SCOPES)
+        return gspread.authorize(creds)
+
+    raise RuntimeError("認証情報が見つかりません。service_account.json を置くか環境変数 SERVICE_ACCOUNT_JSON を設定してください。")
+
+def get_service_account_email():
+    """ユーザーがスプレッドシートに共有するための service account のメールアドレスを取得（存在すれば）"""
+    env = os.environ.get("SERVICE_ACCOUNT_JSON")
+    if env:
+        try:
+            info = json.loads(env)
+        except Exception:
+            info = json.loads(base64.b64decode(env).decode("utf-8"))
+        return info.get("client_email")
+    keyfile = "service_account.json"
+    if os.path.exists(keyfile):
+        with open(keyfile, "r", encoding="utf-8") as f:
+            info = json.load(f)
+        return info.get("client_email")
+    return None
+
+def send_to_google_sheets(nickname, password, result_text):
+    client = get_gspread_client()
+    sheet = client.open(SPREADSHEET_NAME).sheet1
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sheet.append_row([timestamp, nickname, password, result_text], value_input_option="USER_ENTERED")
+
+# --- 初期化 ---
 if "nickname" not in st.session_state:
     st.session_state.nickname = None
 if "password" not in st.session_state:
     st.session_state.password = None
 if "current_key" not in st.session_state:
     st.session_state.current_key = "start"
+if "sent_to_sheet" not in st.session_state:
+    st.session_state.sent_to_sheet = False
 
 st.markdown("<h1 style='text-align: center;'>🧠 性格診断テスト</h1>", unsafe_allow_html=True)
 st.markdown("---")
+
+# 小さなヘルプ（サービスアカウントのメールがわかれば表示）
+sa_email = get_service_account_email()
+if sa_email:
+    st.caption(f"※ スプレッドシートはサービスアカウント `{sa_email}` に編集権限を与えてください（共有設定）。")
+else:
+    st.caption("※ スプレッドシート連携は service_account.json または SERVICE_ACCOUNT_JSON 環境変数 が必要です。")
 
 # ニックネーム + パスワード入力フェーズ
 if st.session_state.nickname is None or st.session_state.password is None:
@@ -83,10 +155,25 @@ else:
         # 結果画像表示
         show_image_for_question(current_key)
 
+        # 送信ボタン（重複送信防止）
+        if not st.session_state.sent_to_sheet:
+            if st.button("📤 診断結果をスプレッドシートに送信"):
+                try:
+                    send_to_google_sheets(st.session_state.nickname, st.session_state.password, result_text)
+                    st.success("✅ スプレッドシートに送信しました！")
+                    st.session_state.sent_to_sheet = True
+                except Exception as e:
+                    st.error(f"送信に失敗しました: {e}")
+                    # よくある原因ヒント
+                    sa = get_service_account_email()
+                    if sa:
+                        st.info(f"ヒント: スプレッドシートが `{sa}` に編集共有されているか確認してください。")
+        else:
+            st.info("（このセッションでは既に送信済みです）")
+
         if st.button("もう一度やる"):
             st.session_state.current_key = "start"
-            st.session_state.nickname = None  # ニックネームをリセット
-            st.session_state.password = None  # パスワードもリセット
+            st.session_state.nickname = None
+            st.session_state.password = None
+            st.session_state.sent_to_sheet = False
             st.rerun()
-
-
